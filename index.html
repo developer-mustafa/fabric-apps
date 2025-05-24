@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fabric Price Calculator | Professional Textile Tool</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --secondary: #10b981;
+      --secondary-hover: #059669;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #f9fafb;
+      color: #111827;
+      transition: all 0.3s ease;
+    }
+    
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .dashboard-card {
+      background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+    }
+    
+    .dashboard-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .language-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+    }
+    
+    /* Bangla font */
+    .bangla {
+      font-family: 'SolaimanLipi', 'Bangla', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl flex items-center space-x-3">
+      <div class="loading-spinner"></div>
+      <span id="loadingText">Loading...</span>
+    </div>
+  </div>
+  
+  <!-- Notification toast -->
+  <div id="toast" class="fixed top-4 right-4 z-50 hidden">
+    <div class="bg-green-500 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 fade-in">
+      <i class="fas fa-check-circle"></i>
+      <span id="toastMessage">Operation successful</span>
+    </div>
+  </div>
+  
+  <!-- Language toggle -->
+  <div class="language-toggle">
+    <button id="toggleLanguage" class="bg-indigo-600 text-white p-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all">
+      <i class="fas fa-language"></i>
+    </button>
+  </div>
+  
+  <!-- Main app container -->
+  <div class="container mx-auto px-4 py-8 max-w-7xl">
+    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-2xl md:text-3xl font-bold" data-en="Fabric Price Calculator" data-bn="ফ্যাব্রিক প্রাইস ক্যালকুলেটর">
+              <i class="fas fa-ruler-combined mr-2"></i> Fabric Price Calculator
+            </h1>
+            <p class="text-indigo-100 mt-1" data-en="Professional textile measurement and pricing tool" data-bn="পেশাদার টেক্সটাইল পরিমাপ এবং মূল্য নির্ধারণ সরঞ্জাম">
+              Professional textile measurement and pricing tool
+            </p>
+          </div>
+          <div class="hidden md:block">
+            <button id="toggleHistoryBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg flex items-center">
+              <i class="fas fa-history mr-2"></i>
+              <span data-en="History" data-bn="ইতিহাস">History</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Dashboard Stats -->
+      <div class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="dashboard-card p-4">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-sm text-gray-500" data-en="Total Calculations" data-bn="মোট হিসাব">Total Calculations</p>
+              <h3 class="text-2xl font-bold" id="totalCalculations">0</h3>
+            </div>
+            <div class="bg-indigo-100 p-3 rounded-full text-indigo-600">
+              <i class="fas fa-calculator"></i>
+            </div>
+          </div>
+        </div>
+        
+        <div class="dashboard-card p-4">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-sm text-gray-500" data-en="Today's Calculations" data-bn="আজকের হিসাব">Today's Calculations</p>
+              <h3 class="text-2xl font-bold" id="todayCalculations">0</h3>
+            </div>
+            <div class="bg-green-100 p-3 rounded-full text-green-600">
+              <i class="fas fa-calendar-day"></i>
+            </div>
+          </div>
+        </div>
+        
+        <div class="dashboard-card p-4">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-sm text-gray-500" data-en="Average Price" data-bn="গড় মূল্য">Average Price</p>
+              <h3 class="text-2xl font-bold" id="averagePrice">0 ৳</h3>
+            </div>
+            <div class="bg-blue-100 p-3 rounded-full text-blue-600">
+              <i class="fas fa-coins"></i>
+            </div>
+          </div>
+        </div>
+        
+        <div class="dashboard-card p-4">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-sm text-gray-500" data-en="Total Value" data-bn="মোট মূল্য">Total Value</p>
+              <h3 class="text-2xl font-bold" id="totalValue">0 ৳</h3>
+            </div>
+            <div class="bg-purple-100 p-3 rounded-full text-purple-600">
+              <i class="fas fa-money-bill-wave"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Main content -->
+      <div class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Calculator form -->
+        <div class="lg:col-span-2">
+          <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+              <i class="fas fa-calculator mr-2 text-indigo-600"></i>
+              <span data-en="Measurement Calculator" data-bn="পরিমাপ ক্যালকুলেটর">Measurement Calculator</span>
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Price per Yard (৳)" data-bn="প্রতি গজের দাম (৳)">Price per Yard (৳)</label>
+                <div class="relative">
+                  <input id="rate" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter rate">
+                  <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                    ৳
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Yards" data-bn="গজ">Yards</label>
+                <input id="yard" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Ghira" data-bn="ঘিরা">Ghira</label>
+                <input id="ghira" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Inches" data-bn="ইঞ্চি">Inches</label>
+                <input id="inch" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
+              </div>
+            </div>
+            
+            <div class="mt-6 grid grid-cols-2 gap-4">
+              <button id="calculateBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-medium flex items-center justify-center">
+                <i class="fas fa-calculator mr-2"></i>
+                <span data-en="Calculate" data-bn="হিসাব করুন">Calculate</span>
+              </button>
+              <button id="resetBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 p-3 rounded-lg font-medium flex items-center justify-center">
+                <i class="fas fa-redo mr-2"></i>
+                <span data-en="Reset" data-bn="রিসেট">Reset</span>
+              </button>
+            </div>
+            
+            <div class="mt-6 bg-indigo-50 border border-indigo-100 p-4 rounded-lg">
+              <h3 class="text-lg font-semibold text-indigo-800 mb-2 flex items-center">
+                <i class="fas fa-coins mr-2"></i>
+                <span data-en="Total Price" data-bn="মোট দাম">Total Price</span>
+              </h3>
+              <div class="text-3xl font-bold text-indigo-700" id="result">0.00 ৳</div>
+              <div class="text-sm text-indigo-600 mt-1" id="breakdown"></div>
+            </div>
+            
+            <div class="mt-6 grid grid-cols-2 md:grid-cols-3 gap-4 no-print">
+              <button id="saveBtn" class="bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg font-medium flex items-center justify-center">
+                <i class="fas fa-save mr-2"></i>
+                <span data-en="Save" data-bn="সংরক্ষণ">Save</span>
+              </button>
+              <button id="printBtn" class="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium flex items-center justify-center">
+                <i class="fas fa-print mr-2"></i>
+                <span data-en="Print" data-bn="প্রিন্ট">Print</span>
+              </button>
+              <button id="pdfBtn" class="bg-red-600 hover:bg-red-700 text-white p-3 rounded-lg font-medium flex items-center justify-center">
+                <i class="fas fa-file-pdf mr-2"></i>
+                <span data-en="PDF" data-bn="পিডিএফ">PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- History section -->
+        <div id="historySection" class="bg-gray-50 p-6 rounded-lg border border-gray-200 lg:block">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+              <i class="fas fa-history mr-2 text-indigo-600"></i>
+              <span data-en="Calculation History" data-bn="হিসাবের ইতিহাস">Calculation History</span>
+            </h2>
+            <button id="closeHistoryBtn" class="lg:hidden text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <div class="mb-4 flex space-x-2">
+            <input type="text" id="historySearch" placeholder="Search..." class="flex-1 p-2 border border-gray-300 rounded-lg" data-en-placeholder="Search..." data-bn-placeholder="খুঁজুন...">
+            <button id="filterBtn" class="bg-indigo-600 text-white p-2 rounded-lg">
+              <i class="fas fa-search"></i>
+            </button>
+          </div>
+          
+          <div class="mb-4 flex flex-wrap gap-2">
+            <button id="filterToday" class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+              <span data-en="Today" data-bn="আজ">Today</span>
+            </button>
+            <button id="filterWeek" class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+              <span data-en="This Week" data-bn="এই সপ্তাহ">This Week</span>
+            </button>
+            <button id="filterMonth" class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+              <span data-en="This Month" data-bn="এই মাস">This Month</span>
+            </button>
+            <button id="filterAll" class="text-xs bg-indigo-600 text-white px-2 py-1 rounded">
+              <span data-en="All" data-bn="সব">All</span>
+            </button>
+          </div>
+          
+          <div class="overflow-y-auto max-h-96">
+            <ul id="history" class="space-y-3">
+              <li class="text-center py-4 text-gray-500">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span data-en="Loading history..." data-bn="ইতিহাস লোড হচ্ছে...">Loading history...</span>
+              </li>
+            </ul>
+          </div>
+          
+          <div class="mt-4 flex justify-between items-center text-sm text-gray-500">
+            <div id="historyCount" data-en="0 items" data-bn="০ আইটেম">0 items</div>
+            <button id="clearHistoryBtn" class="text-red-600 hover:text-red-800 flex items-center">
+              <i class="fas fa-trash-alt mr-1"></i>
+              <span data-en="Clear All" data-bn="সব মুছুন">Clear All</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold" data-en="Edit Calculation" data-bn="হিসাব সম্পাদনা">Edit Calculation</h3>
+        <button id="closeEditModalBtn" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-4">
+        <input type="hidden" id="editId">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Price per Yard (৳)" data-bn="প্রতি গজের দাম (৳)">Price per Yard (৳)</label>
+          <input id="editRate" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+        </div>
+        
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Yards" data-bn="গজ">Yards</label>
+            <input id="editYard" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Ghira" data-bn="ঘিরা">Ghira</label>
+            <input id="editGhira" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-en="Inches" data-bn="ইঞ্চি">Inches</label>
+            <input id="editInch" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+          </div>
+        </div>
+        
+        <div class="flex justify-end space-x-3 pt-4">
+          <button id="cancelEditBtn" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100" data-en="Cancel" data-bn="বাতিল">Cancel</button>
+          <button id="updateBtn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700" data-en="Update" data-bn="আপডেট">Update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+]
+
+      <script>
+    // Supabase configuration
+    const supabaseUrl = 'https://erihbeinkymnymncnawm.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyaWhiZWlua3ltbnltbmNuYXdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY3NzEwMzUsImV4cCI6MjA2MjM0NzAzNX0.xhE0_RbBQ9qQcYHa5sv-S9-cUolJruo0Km3oud-GtOM';
+    const supabaseMain = supabase.createClient(supabaseUrl, supabaseKey);
+    
+    // Initialize jsPDF
+    const { jsPDF } = window.jspdf;
+    
+    // DOM elements
+    const rateInput = document.getElementById("rate");
+    const yardInput = document.getElementById("yard");
+    const ghiraInput = document.getElementById("ghira");
+    const inchInput = document.getElementById("inch");
+    const resultEl = document.getElementById("result");
+    const breakdownEl = document.getElementById("breakdown");
+    const historyEl = document.getElementById("history");
+    const historyCountEl = document.getElementById("historyCount");
+    const historySearchEl = document.getElementById("historySearch");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const loadingText = document.getElementById("loadingText");
+    const toast = document.getElementById("toast");
+    const toastMessage = document.getElementById("toastMessage");
+    const historySection = document.getElementById("historySection");
+    const editModal = document.getElementById("editModal");
+    const toggleLanguageBtn = document.getElementById("toggleLanguage");
+    
+    // Dashboard elements
+    const totalCalculationsEl = document.getElementById("totalCalculations");
+    const todayCalculationsEl = document.getElementById("todayCalculations");
+    const averagePriceEl = document.getElementById("averagePrice");
+    const totalValueEl = document.getElementById("totalValue");
+    
+    // Button elements
+    const calculateBtn = document.getElementById("calculateBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const saveBtn = document.getElementById("saveBtn");
+    const printBtn = document.getElementById("printBtn");
+    const pdfBtn = document.getElementById("pdfBtn");
+    const toggleHistoryBtn = document.getElementById("toggleHistoryBtn");
+    const closeHistoryBtn = document.getElementById("closeHistoryBtn");
+    const filterBtn = document.getElementById("filterBtn");
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+    const closeEditModalBtn = document.getElementById("closeEditModalBtn");
+    const cancelEditBtn = document.getElementById("cancelEditBtn");
+    const updateBtn = document.getElementById("updateBtn");
+    
+    // Filter buttons
+    const filterToday = document.getElementById("filterToday");
+    const filterWeek = document.getElementById("filterWeek");
+    const filterMonth = document.getElementById("filterMonth");
+    const filterAll = document.getElementById("filterAll");
+    
+    // Constants
+    const GHIRA_PER_YARD = 16;
+    const INCH_PER_YARD = 36;
+    let currentLanguage = 'en'; // 'en' or 'bn'
+    let allCalculations = [];
+    
+    // Initialize the app
+    document.addEventListener('DOMContentLoaded', function() {
+      loadRate();
+      loadDashboardStats();
+      loadHistory();
+      
+      // Set up event listeners for real-time calculation
+      [rateInput, yardInput, ghiraInput, inchInput].forEach(input => {
+        input.addEventListener('input', debounce(calculatePrice, 200));
+      });
+      
+      // Button event listeners
+      calculateBtn.addEventListener('click', calculatePrice);
+      resetBtn.addEventListener('click', resetForm);
+      saveBtn.addEventListener('click', saveCalculation);
+      printBtn.addEventListener('click', printResult);
+      pdfBtn.addEventListener('click', generatePDF);
+      toggleHistoryBtn.addEventListener('click', toggleHistorySection);
+      closeHistoryBtn.addEventListener('click', toggleHistorySection);
+      filterBtn.addEventListener('click', filterHistory);
+      clearHistoryBtn.addEventListener('click', clearHistory);
+      closeEditModalBtn.addEventListener('click', closeEditModal);
+      cancelEditBtn.addEventListener('click', closeEditModal);
+      updateBtn.addEventListener('click', updateCalculation);
+      toggleLanguageBtn.addEventListener('click', toggleLanguage);
+      
+      // Filter event listeners
+      filterToday.addEventListener('click', () => filterByTime('today'));
+      filterWeek.addEventListener('click', () => filterByTime('week'));
+      filterMonth.addEventListener('click', () => filterByTime('month'));
+      filterAll.addEventListener('click', () => filterByTime('all'));
+      
+      // Real-time search
+      historySearchEl.addEventListener('input', debounce(filterHistory, 300));
+      
+      // For mobile, hide history by default
+      if (window.innerWidth < 1024) {
+        historySection.classList.add('hidden');
+      }
+    });
+    
+    // Toggle between English and Bangla
+    function toggleLanguage() {
+      currentLanguage = currentLanguage === 'en' ? 'bn' : 'en';
+      updateLanguage();
+    }
+    
+    // Update all language elements
+    function updateLanguage() {
+      document.querySelectorAll('[data-en], [data-bn]').forEach(el => {
+        if (el.dataset[currentLanguage]) {
+          if (el.tagName === 'INPUT' && el.placeholder) {
+            el.placeholder = el.dataset[`${currentLanguage}-placeholder`] || el.dataset[currentLanguage];
+          } else {
+            el.textContent = el.dataset[currentLanguage];
+          }
+        }
+      });
+      
+      // Update loading text
+      loadingText.textContent = currentLanguage === 'en' ? 'Loading...' : 'লোড হচ্ছে...';
+      
+      // Update toast if visible
+      if (!toast.classList.contains('hidden')) {
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 100);
+      }
+    }
+    
+    // Debounce function for performance optimization
+    function debounce(func, wait) {
+      let timeout;
+      return function() {
+        const context = this, args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
+      };
+    }
+    
+    // Toggle history section visibility
+    function toggleHistorySection() {
+      historySection.classList.toggle('hidden');
+    }
+    
+    // Show loading overlay
+    function showLoading(message = '') {
+      if (message) {
+        loadingText.textContent = currentLanguage === 'en' ? message : 
+          (message === 'Loading...' ? 'লোড হচ্ছে...' : message);
+      }
+      loadingOverlay.classList.remove('hidden');
+    }
+    
+    // Hide loading overlay
+    function hideLoading() {
+      loadingOverlay.classList.add('hidden');
+    }
+    
+    // Show toast notification
+    function showToast(message, isError = false) {
+      toastMessage.textContent = message;
+      toast.className = isError ? 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 fade-in' : 
+        'fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 fade-in';
+      toast.classList.remove('hidden');
+      
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+    
+    // Load saved rate from localStorage
+    function loadRate() {
+      const savedRate = localStorage.getItem("yardRate");
+      if (savedRate) {
+        rateInput.value = savedRate;
+      }
+    }
+    
+    // Save rate to localStorage
+    function saveRate(rate) {
+      localStorage.setItem("yardRate", rate);
+    }
+    
+    // Reset form
+    function resetForm() {
+      yardInput.value = '';
+      ghiraInput.value = '';
+      inchInput.value = '';
+      resultEl.textContent = '0.00 ৳';
+      breakdownEl.textContent = '';
+    }
+    
+    // Calculate fabric price in real-time
+    function calculatePrice() {
+      const rate = parseFloat(rateInput.value);
+      const yard = parseFloat(yardInput.value || 0);
+      const ghira = parseFloat(ghiraInput.value || 0);
+      const inch = parseFloat(inchInput.value || 0);
+      
+      if (isNaN(rate)) {
+        resultEl.textContent = currentLanguage === 'en' ? 'Enter rate first' : 'প্রথমে হার লিখুন';
+        return;
+      }
+      
+      saveRate(rate);
+      
+      // Calculate total inches
+      const totalInch = (yard * INCH_PER_YARD) + 
+                       (ghira * (INCH_PER_YARD / GHIRA_PER_YARD)) + 
+                       inch;
+      
+      // Convert to yards
+      const totalYard = totalInch / INCH_PER_YARD;
+      
+      // Calculate price
+      const price = (totalYard * rate).toFixed(2);
+      
+      // Update UI
+      resultEl.textContent = `${price} ৳`;
+      
+      // Show breakdown
+      breakdownEl.textContent = `${totalYard.toFixed(3)} ${currentLanguage === 'en' ? 'yards' : 'গজ'} (${totalInch.toFixed(2)} ${currentLanguage === 'en' ? 'inches' : 'ইঞ্চি'})`;
+    }
+    
+    // Load dashboard statistics
+    async function loadDashboardStats() {
+      showLoading('Loading dashboard...');
+      
+      try {
+        // Get total calculations
+        const { count: totalCount } = await supabaseMain
+          .from('clothtable')
+          .select('*', { count: 'exact', head: true });
+        
+        // Get today's calculations
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const { count: todayCount } = await supabaseMain
+          .from('clothtable')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', today.toISOString());
+        
+        // Get average price and total value
+        const { data: stats } = await supabaseMain
+          .from('clothtable')
+          .select('price');
+        
+        const totalValue = stats.reduce((sum, item) => sum + item.price, 0);
+        const averagePrice = stats.length > 0 ? (totalValue / stats.length).toFixed(2) : 0;
+        
+        // Update UI
+        totalCalculationsEl.textContent = totalCount || 0;
+        todayCalculationsEl.textContent = todayCount || 0;
+        averagePriceEl.textContent = `${averagePrice} ৳`;
+        totalValueEl.textContent = `${totalValue.toFixed(2)} ৳`;
+        
+      } catch (error) {
+        console.error('Error loading dashboard stats:', error);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    // Save calculation to Supabase
+    async function saveCalculation() {
+      const rate = parseFloat(rateInput.value);
+      const yard = parseFloat(yardInput.value || 0);
+      const ghira = parseFloat(ghiraInput.value || 0);
+      const inch = parseFloat(inchInput.value || 0);
+      const price = resultEl.textContent.replace('৳', '').trim();
+      
+      if (isNaN(rate)) {
+        showToast(currentLanguage === 'en' ? 'Please enter a valid rate' : 'একটি বৈধ হার লিখুন দয়া করে', true);
+        return;
+      }
+      
+      if (yard === 0 && ghira === 0 && inch === 0) {
+        showToast(currentLanguage === 'en' ? 'Please enter measurements' : 'পরিমাপ লিখুন দয়া করে', true);
+        return;
+      }
+      
+      showLoading(currentLanguage === 'en' ? 'Saving...' : 'সংরক্ষণ করা হচ্ছে...');
+      
+      try {
+        const { data, error } = await supabaseMain
+          .from('clothtable')
+          .insert([
+            { 
+              rate: rate,
+              yard: yard,
+              ghira: ghira,
+              inch: inch,
+              price: parseFloat(price),
+              created_at: new Date().toISOString()
+            }
+          ])
+          .select();
+          
+        if (error) throw error;
+        
+        showToast(currentLanguage === 'en' ? 'Calculation saved successfully' : 'হিসাব সফলভাবে সংরক্ষণ করা হয়েছে');
+        loadHistory();
+        loadDashboardStats();
+      } catch (error) {
+        console.error('Error saving calculation:', error);
+        showToast(currentLanguage === 'en' ? 'Failed to save calculation' : 'হিসাব সংরক্ষণ করতে ব্যর্থ হয়েছে', true);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    // Load history from Supabase with optimized query
+    async function loadHistory() {
+      showLoading(currentLanguage === 'en' ? 'Loading history...' : 'ইতিহাস লোড হচ্ছে...');
+      
+      try {
+        let { data: calculations, error } = await supabaseMain
+          .from('clothtable')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+          
+        if (error) throw error;
+        
+        allCalculations = calculations || [];
+        renderHistory(allCalculations);
+      } catch (error) {
+        console.error('Error loading history:', error);
+        showToast(currentLanguage === 'en' ? 'Failed to load history' : 'ইতিহাস লোড করতে ব্যর্থ হয়েছে', true);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    // Filter history based on search term with client-side caching
+    function filterHistory() {
+      const searchTerm = historySearchEl.value.trim().toLowerCase();
+      
+      if (!searchTerm) {
+        renderHistory(allCalculations);
+        return;
+      }
+      
+      // Client-side filtering for better performance
+      const filtered = allCalculations.filter(item => 
+        item.yard.toString().includes(searchTerm) ||
+        item.ghira.toString().includes(searchTerm) ||
+        item.inch.toString().includes(searchTerm) ||
+        item.price.toString().includes(searchTerm) ||
+        new Date(item.created_at).toLocaleString().toLowerCase().includes(searchTerm)
+      );
+      
+      renderHistory(filtered);
+    }
+    
+    // Filter by time period
+    async function filterByTime(period) {
+      showLoading(currentLanguage === 'en' ? 'Filtering...' : 'ফিল্টার করা হচ্ছে...');
+      
+      try {
+        let query = supabase
+          .from('clothtable')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        const now = new Date();
+        
+        if (period === 'today') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          query = query.gte('created_at', today.toISOString());
+          setActiveFilterButton(filterToday);
+        } else if (period === 'week') {
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          query = query.gte('created_at', weekAgo.toISOString());
+          setActiveFilterButton(filterWeek);
+        } else if (period === 'month') {
+          const monthAgo = new Date();
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          query = query.gte('created_at', monthAgo.toISOString());
+          setActiveFilterButton(filterMonth);
+        } else {
+          setActiveFilterButton(filterAll);
+        }
+        
+        const { data: calculations, error } = await query;
+        
+        if (error) throw error;
+        
+        renderHistory(calculations);
+      } catch (error) {
+        console.error('Error filtering by time:', error);
+        showToast(currentLanguage === 'en' ? 'Failed to filter' : 'ফিল্টার করতে ব্যর্থ হয়েছে', true);
+      } finally {
+        hideLoading();
+      }
+    }
+    
+    // Set active filter button
+    function setActiveFilterButton(activeButton) {
+      [filterToday, filterWeek, filterMonth, filterAll].forEach(btn => {
+        if (btn === activeButton) {
+          btn.classList.remove('bg-indigo-100', 'text-indigo-800');
+          btn.classList.add('bg-indigo-600', 'text-white');
+        } else {
+          btn.classList.remove('bg-indigo-600', 'text-white');
+          btn.classList.add('bg-indigo-100', 'text-indigo-800');
+        }
+      });
+    }
+    
+    // Render history list with virtualization for performance
+    function renderHistory(calculations) {
+      if (!calculations || calculations.length === 0) {
+        historyEl.innerHTML = `<li class="text-center py-4 text-gray-500">${
+          currentLanguage === 'en' ? 'No history found' : 'কোন ইতিহাস পাওয়া যায়নি'
+        }</li>`;
+        historyCountEl.textContent = currentLanguage === 'en' ? '0 items' : '০ আইটেম';
+        return;
+      }
+      
+     const itemsToRender = calculations.slice(0, 50); // Render first 50 items for performance
+  
+  historyEl.innerHTML = itemsToRender.map(item => `
+    <li class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="font-medium">${item.price} ৳</div>
+          <div class="text-sm text-gray-600 mt-1">
+            ${item.yard || 0} ${currentLanguage === 'en' ? 'yd' : 'গজ'}, 
+            ${item.ghira || 0} ${currentLanguage === 'en' ? 'gh' : 'ঘিরা'}, 
+            ${item.inch || 0} ${currentLanguage === 'en' ? 'in' : 'ইঞ্চি'}
+          </div>
+          <div class="text-xs text-gray-500 mt-1">
+            ${new Date(item.created_at).toLocaleString()}
+          </div>
+        </div>
+        <div class="flex space-x-2">
+          <button onclick="openEditModal('${item.id}')" class="text-blue-600 hover:text-blue-800">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button onclick="deleteCalculation('${item.id}')" class="text-red-600 hover:text-red-800">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </div>
+      </div>
+    </li>
+  `).join('');
+  
+  // Add "Load More" button if there are more items
+  if (calculations.length > 50) {
+    historyEl.innerHTML += `
+      <li id="loadMoreBtn" class="text-center py-3 text-indigo-600 font-medium cursor-pointer hover:underline">
+        ${currentLanguage === 'en' ? 'Load more...' : 'আরো লোড করুন...'}
+      </li>
+    `;
+    document.getElementById('loadMoreBtn').addEventListener('click', () => {
+      renderHistory(calculations); // Render all items when clicked
+    });
+  }
+  
+  historyCountEl.textContent = currentLanguage === 'en' 
+    ? `${calculations.length} ${calculations.length === 1 ? 'item' : 'items'}`
+    : `${calculations.length} ${calculations.length === 1 ? 'আইটেম' : 'আইটেমসমূহ'}`;
+}
+
+// Clear all history
+async function clearHistory() {
+  const confirmMessage = currentLanguage === 'en' 
+    ? 'Are you sure you want to delete all history? This cannot be undone.'
+    : 'আপনি কি নিশ্চিত যে আপনি সমস্ত ইতিহাস মুছতে চান? এটি পূর্বাবস্থায় ফিরিয়ে আনা যাবে না।';
+  
+  if (!confirm(confirmMessage)) {
+    return;
+  }
+  
+  showLoading(currentLanguage === 'en' ? 'Clearing...' : 'মুছে ফেলা হচ্ছে...');
+  
+  try {
+    const { error } = await supabaseMain
+      .from('clothtable')
+      .delete()
+      .neq('id', 0); // Delete all records
+      
+    if (error) throw error;
+    
+    showToast(currentLanguage === 'en' ? 'All history cleared' : 'সমস্ত ইতিহাস মুছে ফেলা হয়েছে');
+    allCalculations = [];
+    renderHistory([]);
+    loadDashboardStats();
+  } catch (error) {
+    console.error('Error clearing history:', error);
+    showToast(currentLanguage === 'en' ? 'Failed to clear history' : 'ইতিহাস মুছতে ব্যর্থ হয়েছে', true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// Open edit modal
+async function openEditModal(id) {
+  showLoading(currentLanguage === 'en' ? 'Loading...' : 'লোড হচ্ছে...');
+  
+  try {
+    const { data: calculation, error } = await supabaseMain
+      .from('clothtable')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (error) throw error;
+    
+    document.getElementById('editId').value = id;
+    document.getElementById('editRate').value = calculation.rate;
+    document.getElementById('editYard').value = calculation.yard;
+    document.getElementById('editGhira').value = calculation.ghira;
+    document.getElementById('editInch').value = calculation.inch;
+    
+    editModal.classList.remove('hidden');
+  } catch (error) {
+    console.error('Error loading calculation:', error);
+    showToast(currentLanguage === 'en' ? 'Failed to load calculation' : 'হিসাব লোড করতে ব্যর্থ হয়েছে', true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// Close edit modal
+function closeEditModal() {
+  editModal.classList.add('hidden');
+}
+
+// Update calculation
+async function updateCalculation() {
+  const id = document.getElementById('editId').value;
+  const rate = parseFloat(document.getElementById('editRate').value);
+  const yard = parseFloat(document.getElementById('editYard').value || 0);
+  const ghira = parseFloat(document.getElementById('editGhira').value || 0);
+  const inch = parseFloat(document.getElementById('editInch').value || 0);
+  
+  if (isNaN(rate)) {
+    showToast(currentLanguage === 'en' ? 'Please enter a valid rate' : 'একটি বৈধ হার লিখুন দয়া করে', true);
+    return;
+  }
+  
+  // Calculate new price
+  const totalInch = (yard * INCH_PER_YARD) + 
+                   (ghira * (INCH_PER_YARD / GHIRA_PER_YARD)) + 
+                   inch;
+  const totalYard = totalInch / INCH_PER_YARD;
+  const price = (totalYard * rate).toFixed(2);
+  
+  showLoading(currentLanguage === 'en' ? 'Updating...' : 'আপডেট করা হচ্ছে...');
+  
+  try {
+    const { data, error } = await supabaseMain
+      .from('clothtable')
+      .update({
+        rate: rate,
+        yard: yard,
+        ghira: ghira,
+        inch: inch,
+        price: parseFloat(price),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+      
+    if (error) throw error;
+    
+    showToast(currentLanguage === 'en' ? 'Calculation updated successfully' : 'হিসাব সফলভাবে আপডেট করা হয়েছে');
+    closeEditModal();
+    loadHistory();
+    loadDashboardStats();
+  } catch (error) {
+    console.error('Error updating calculation:', error);
+    showToast(currentLanguage === 'en' ? 'Failed to update calculation' : 'হিসাব আপডেট করতে ব্যর্থ হয়েছে', true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// Delete calculation
+async function deleteCalculation(id) {
+  const confirmMessage = currentLanguage === 'en' 
+    ? 'Are you sure you want to delete this calculation?'
+    : 'আপনি কি নিশ্চিত যে আপনি এই হিসাবটি মুছতে চান?';
+  
+  if (!confirm(confirmMessage)) {
+    return;
+  }
+  
+  showLoading(currentLanguage === 'en' ? 'Deleting...' : 'মুছে ফেলা হচ্ছে...');
+  
+  try {
+    const { error } = await supabaseMain
+      .from('clothtable')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    
+    showToast(currentLanguage === 'en' ? 'Calculation deleted' : 'হিসাব মুছে ফেলা হয়েছে');
+    loadHistory();
+    loadDashboardStats();
+  } catch (error) {
+    console.error('Error deleting calculation:', error);
+    showToast(currentLanguage === 'en' ? 'Failed to delete calculation' : 'হিসাব মুছতে ব্যর্থ হয়েছে', true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// Print result
+function printResult() {
+  const rate = rateInput.value || 0;
+  const yard = yardInput.value || 0;
+  const ghira = ghiraInput.value || 0;
+  const inch = inchInput.value || 0;
+  const price = resultEl.textContent;
+  
+  if (yard === 0 && ghira === 0 && inch === 0) {
+    showToast(currentLanguage === 'en' ? 'Nothing to print' : 'প্রিন্ট করার কিছু নেই', true);
+    return;
+  }
+  
+  const printWindow = window.open('', '', 'width=600,height=600');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${currentLanguage === 'en' ? 'Fabric Calculation' : 'ফ্যাব্রিক হিসাব'}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #4f46e5; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .total { font-weight: bold; font-size: 1.2em; margin-top: 20px; }
+        .footer { margin-top: 30px; font-size: 0.8em; text-align: center; color: #666; }
+      </style>
+    </head>
+    <body>
+      <h1>${currentLanguage === 'en' ? 'Fabric Calculation' : 'ফ্যাব্রিক হিসাব'}</h1>
+      <p><strong>${currentLanguage === 'en' ? 'Date:' : 'তারিখ:'}</strong> ${new Date().toLocaleString()}</p>
+      
+      <table>
+        <tr>
+          <th>${currentLanguage === 'en' ? 'Measurement' : 'পরিমাপ'}</th>
+          <th>${currentLanguage === 'en' ? 'Value' : 'মান'}</th>
+        </tr>
+        <tr>
+          <td>${currentLanguage === 'en' ? 'Rate per Yard' : 'প্রতি গজের হার'}</td>
+          <td>${rate} ৳</td>
+        </tr>
+        <tr>
+          <td>${currentLanguage === 'en' ? 'Yards' : 'গজ'}</td>
+          <td>${yard}</td>
+        </tr>
+        <tr>
+          <td>${currentLanguage === 'en' ? 'Ghira' : 'ঘিরা'}</td>
+          <td>${ghira}</td>
+        </tr>
+        <tr>
+          <td>${currentLanguage === 'en' ? 'Inches' : 'ইঞ্চি'}</td>
+          <td>${inch}</td>
+        </tr>
+      </table>
+      
+      <div class="total">
+        ${currentLanguage === 'en' ? 'Total Price:' : 'মোট দাম:'} ${price}
+      </div>
+      
+      <div class="footer">
+        ${currentLanguage === 'en' ? 'Generated by Fabric Price Calculator' : 'ফ্যাব্রিক প্রাইস ক্যালকুলেটর দ্বারা তৈরি'}
+      </div>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+// Generate PDF
+async function generatePDF() {
+  const rate = rateInput.value || 0;
+  const yard = yardInput.value || 0;
+  const ghira = ghiraInput.value || 0;
+  const inch = inchInput.value || 0;
+  const price = resultEl.textContent;
+  
+  if (yard === 0 && ghira === 0 && inch === 0) {
+    showToast(currentLanguage === 'en' ? 'Nothing to generate' : 'তৈরি করার কিছু নেই', true);
+    return;
+  }
+  
+  showLoading(currentLanguage === 'en' ? 'Generating PDF...' : 'পিডিএফ তৈরি হচ্ছে...');
+  
+  try {
+    // Create a new jsPDF instance
+    const doc = new jsPDF();
+    
+    // Add logo or title
+    doc.setFontSize(20);
+    doc.setTextColor(79, 70, 229);
+    doc.text(currentLanguage === 'en' ? 'Fabric Calculation' : 'ফ্যাব্রিক হিসাব', 105, 20, { align: 'center' });
+    
+    // Add date
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${currentLanguage === 'en' ? 'Date:' : 'তারিখ:'} ${new Date().toLocaleString()}`, 14, 30);
+    
+    // Add measurement table
+    doc.autoTable({
+      startY: 40,
+      head: [[
+        currentLanguage === 'en' ? 'Measurement' : 'পরিমাপ', 
+        currentLanguage === 'en' ? 'Value' : 'মান'
+      ]],
+      body: [
+        [currentLanguage === 'en' ? 'Rate per Yard' : 'প্রতি গজের হার', `${rate} ৳`],
+        [currentLanguage === 'en' ? 'Yards' : 'গজ', yard],
+        [currentLanguage === 'en' ? 'Ghira' : 'ঘিরা', ghira],
+        [currentLanguage === 'en' ? 'Inches' : 'ইঞ্চি', inch]
+      ],
+      theme: 'grid',
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: 255
+      }
+    });
+    
+    // Add total price
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${currentLanguage === 'en' ? 'Total Price:' : 'মোট দাম:'} ${price}`, 14, doc.autoTable.previous.finalY + 20);
+    
+    // Add footer
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      currentLanguage === 'en' 
+        ? 'Generated by Fabric Price Calculator' 
+        : 'ফ্যাব্রিক প্রাইস ক্যালকুলেটর দ্বারা তৈরি', 
+      105, 
+      doc.internal.pageSize.height - 10, 
+      { align: 'center' }
+    );
+    
+    // Save the PDF
+    doc.save(`fabric_calculation_${new Date().toISOString().slice(0, 10)}.pdf`);
+    
+    showToast(currentLanguage === 'en' ? 'PDF generated' : 'পিডিএফ তৈরি করা হয়েছে');
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    showToast(currentLanguage === 'en' ? 'Failed to generate PDF' : 'পিডিএফ তৈরি করতে ব্যর্থ হয়েছে', true);
+  } finally {
+    hideLoading();
+  }
+}
+
+</script>
+
+
+
+
+  </body>
+</html>

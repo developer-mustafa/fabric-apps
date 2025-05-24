@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fabric Price Calculator | Professional Textile Tool</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      :root {
+        --primary: #4f46e5;
+        --primary-hover: #4338ca;
+        --secondary: #10b981;
+        --secondary-hover: #059669;
+      }
+      
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background-color: #f9fafb;
+        color: #111827;
+      }
+      
+      .loading-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      .print-only {
+        display: none;
+      }
+      
+      @media print {
+        .no-print {
+          display: none;
+        }
+        .print-only {
+          display: block;
+        }
+        body {
+          background-color: white;
+          color: black;
+          font-size: 14pt;
+        }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white p-6 rounded-lg shadow-xl flex items-center space-x-3">
+        <div class="loading-spinner"></div>
+        <span>Loading...</span>
+      </div>
+    </div>
+    
+    <!-- Notification toast -->
+    <div id="toast" class="fixed top-4 right-4 z-50 hidden">
+      <div class="bg-green-500 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 fade-in">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage">Operation successful</span>
+      </div>
+    </div>
+    
+    <!-- Main app container -->
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+      <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+          <div class="flex justify-between items-center">
+            <div>
+              <h1 class="text-2xl md:text-3xl font-bold">
+                <i class="fas fa-ruler-combined mr-2"></i> Fabric Price Calculator
+              </h1>
+              <p class="text-indigo-100 mt-1">Professional textile measurement and pricing tool</p>
+            </div>
+            <div class="hidden md:block">
+              <button id="toggleHistoryBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-history mr-2"></i> History
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Main content -->
+        <div class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Calculator form -->
+          <div class="lg:col-span-2">
+            <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+              <h2 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+                <i class="fas fa-calculator mr-2 text-indigo-600"></i> Measurement Calculator
+              </h2>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Price per Yard (৳)</label>
+                  <div class="relative">
+                    <input id="rate" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter rate">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                      ৳
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Yards</label>
+                  <input id="yard" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Ghira</label>
+                  <input id="ghira" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Inches</label>
+                  <input id="inch" type="number" step="0.01" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0">
+                </div>
+              </div>
+              
+              <div class="mt-6 grid grid-cols-2 gap-4">
+                <button id="calculateBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-medium flex items-center justify-center">
+                  <i class="fas fa-calculator mr-2"></i> Calculate
+                </button>
+                <button id="resetBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 p-3 rounded-lg font-medium flex items-center justify-center">
+                  <i class="fas fa-redo mr-2"></i> Reset
+                </button>
+              </div>
+              
+              <div class="mt-6 bg-indigo-50 border border-indigo-100 p-4 rounded-lg">
+                <h3 class="text-lg font-semibold text-indigo-800 mb-2 flex items-center">
+                  <i class="fas fa-coins mr-2"></i> Total Price
+                </h3>
+                <div class="text-3xl font-bold text-indigo-700" id="result">0.00 ৳</div>
+                <div class="text-sm text-indigo-600 mt-1" id="breakdown"></div>
+              </div>
+              
+              <div class="mt-6 grid grid-cols-2 gap-4 no-print">
+                <button id="saveBtn" class="bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg font-medium flex items-center justify-center">
+                  <i class="fas fa-save mr-2"></i> Save
+                </button>
+                <button id="printBtn" class="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-medium flex items-center justify-center">
+                  <i class="fas fa-print mr-2"></i> Print
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- History section -->
+          <div id="historySection" class="bg-gray-50 p-6 rounded-lg border border-gray-200 lg:block">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-history mr-2 text-indigo-600"></i> Calculation History
+              </h2>
+              <button id="closeHistoryBtn" class="lg:hidden text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div class="mb-4 flex space-x-2">
+              <input type="text" id="historySearch" placeholder="Search..." class="flex-1 p-2 border border-gray-300 rounded-lg">
+              <button id="filterBtn" class="bg-indigo-600 text-white p-2 rounded-lg">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+            
+            <div class="overflow-y-auto max-h-96">
+              <ul id="history" class="space-y-3">
+                <li class="text-center py-4 text-gray-500">
+                  <i class="fas fa-spinner fa-spin"></i> Loading history...
+                </li>
+              </ul>
+            </div>
+            
+            <div class="mt-4 flex justify-between items-center text-sm text-gray-500">
+              <div id="historyCount">0 items</div>
+              <button id="clearHistoryBtn" class="text-red-600 hover:text-red-800 flex items-center">
+                <i class="fas fa-trash-alt mr-1"></i> Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Print template -->
+      <div id="printTemplate" class="print-only p-8 hidden">
+        <h1 class="text-2xl font-bold mb-2">Fabric Price Calculation</h1>
+        <p class="mb-1">Date: <span id="printDate"></span></p>
+        <p class="mb-1">Rate: <span id="printRate"></span> ৳ per yard</p>
+        <p class="mb-1">Measurements: <span id="printMeasurements"></span></p>
+        <hr class="my-4 border-gray-300">
+        <h2 class="text-xl font-bold mb-2">Total Price: <span id="printTotal"></span></h2>
+        <p class="text-sm text-gray-600 mt-4">Generated by Fabric Price Calculator</p>
+      </div>
+    </div>
+
+    <!-- Edit modal -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-semibold">Edit Calculation</h3>
+          <button id="closeEditModalBtn" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <input type="hidden" id="editId">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Price per Yard (৳)</label>
+            <input id="editRate" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+          </div>
+          
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Yards</label>
+              <input id="editYard" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Ghira</label>
+              <input id="editGhira" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Inches</label>
+              <input id="editInch" type="number" step="0.01" class="w-full p-2 rounded border border-gray-300">
+            </div>
+          </div>
+          
+          <div class="flex justify-end space-x-3 pt-4">
+            <button id="cancelEditBtn" class="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100">Cancel</button>
+            <button id="updateBtn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Supabase configuration
+      const supabaseUrl = 'https://erihbeinkymnymncnawm.supabase.co';
+      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyaWhiZWlua3ltbnltbmNuYXdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY3NzEwMzUsImV4cCI6MjA2MjM0NzAzNX0.xhE0_RbBQ9qQcYHa5sv-S9-cUolJruo0Km3oud-GtOM';
+      const supabased = supabase.createClient(supabaseUrl, supabaseKey);
+      
+      // DOM elements
+      const rateInput = document.getElementById("rate");
+      const yardInput = document.getElementById("yard");
+      const ghiraInput = document.getElementById("ghira");
+      const inchInput = document.getElementById("inch");
+      const resultEl = document.getElementById("result");
+      const breakdownEl = document.getElementById("breakdown");
+      const historyEl = document.getElementById("history");
+      const historyCountEl = document.getElementById("historyCount");
+      const historySearchEl = document.getElementById("historySearch");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+      const toast = document.getElementById("toast");
+      const toastMessage = document.getElementById("toastMessage");
+      const historySection = document.getElementById("historySection");
+      const editModal = document.getElementById("editModal");
+      
+      // Button elements
+      const calculateBtn = document.getElementById("calculateBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const saveBtn = document.getElementById("saveBtn");
+      const printBtn = document.getElementById("printBtn");
+      const toggleHistoryBtn = document.getElementById("toggleHistoryBtn");
+      const closeHistoryBtn = document.getElementById("closeHistoryBtn");
+      const filterBtn = document.getElementById("filterBtn");
+      const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+      const closeEditModalBtn = document.getElementById("closeEditModalBtn");
+      const cancelEditBtn = document.getElementById("cancelEditBtn");
+      const updateBtn = document.getElementById("updateBtn");
+      
+      // Constants
+      const GHIRA_PER_YARD = 16;
+      const INCH_PER_YARD = 36;
+      
+      // Initialize the app
+      document.addEventListener('DOMContentLoaded', function() {
+        loadRate();
+        loadHistory();
+        
+        // Set up event listeners for auto-calculation
+        [rateInput, yardInput, ghiraInput, inchInput].forEach(input => {
+          input.addEventListener('input', debounce(calculatePrice, 300));
+        });
+        
+        // Button event listeners
+        calculateBtn.addEventListener('click', calculatePrice);
+        resetBtn.addEventListener('click', resetForm);
+        saveBtn.addEventListener('click', saveCalculation);
+        printBtn.addEventListener('click', printResult);
+        toggleHistoryBtn.addEventListener('click', toggleHistorySection);
+        closeHistoryBtn.addEventListener('click', toggleHistorySection);
+        filterBtn.addEventListener('click', filterHistory);
+        clearHistoryBtn.addEventListener('click', clearHistory);
+        closeEditModalBtn.addEventListener('click', closeEditModal);
+        cancelEditBtn.addEventListener('click', closeEditModal);
+        updateBtn.addEventListener('click', updateCalculation);
+        
+        // For mobile, hide history by default
+        if (window.innerWidth < 1024) {
+          historySection.classList.add('hidden');
+        }
+      });
+      
+      // Debounce function to limit rapid firing of events
+      function debounce(func, wait) {
+        let timeout;
+        return function() {
+          const context = this, args = arguments;
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(context, args), wait);
+        };
+      }
+      
+      // Toggle history section visibility (for mobile)
+      function toggleHistorySection() {
+        historySection.classList.toggle('hidden');
+      }
+      
+      // Show loading overlay
+      function showLoading() {
+        loadingOverlay.classList.remove('hidden');
+      }
+      
+      // Hide loading overlay
+      function hideLoading() {
+        loadingOverlay.classList.add('hidden');
+      }
+      
+      // Show toast notification
+      function showToast(message, isError = false) {
+        toastMessage.textContent = message;
+        toast.className = isError ? 'fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 fade-in' : 'fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 fade-in';
+        toast.classList.remove('hidden');
+        
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 3000);
+      }
+      
+      // Load saved rate from localStorage
+      function loadRate() {
+        const savedRate = localStorage.getItem("yardRate");
+        if (savedRate) {
+          rateInput.value = savedRate;
+        }
+      }
+      
+      // Save rate to localStorage
+      function saveRate(rate) {
+        localStorage.setItem("yardRate", rate);
+      }
+      
+      // Reset form
+      function resetForm() {
+        yardInput.value = '';
+        ghiraInput.value = '';
+        inchInput.value = '';
+        resultEl.textContent = '0.00 ৳';
+        breakdownEl.textContent = '';
+      }
+      
+      // Calculate fabric price
+      function calculatePrice() {
+        const rate = parseFloat(rateInput.value);
+        const yard = parseFloat(yardInput.value || 0);
+        const ghira = parseFloat(ghiraInput.value || 0);
+        const inch = parseFloat(inchInput.value || 0);
+        
+        if (isNaN(rate)) {
+          resultEl.textContent = 'Enter rate first';
+          return;
+        }
+        
+        saveRate(rate);
+        
+        // Calculate total inches
+        const totalInch = (yard * INCH_PER_YARD) + 
+                         (ghira * (INCH_PER_YARD / GHIRA_PER_YARD)) + 
+                         inch;
+        
+        // Convert to yards
+        const totalYard = totalInch / INCH_PER_YARD;
+        
+        // Calculate price
+        const price = (totalYard * rate).toFixed(2);
+        
+        // Update UI
+        resultEl.textContent = `${price} ৳`;
+        
+        // Show breakdown
+        breakdownEl.textContent = `${totalYard.toFixed(3)} yards (${totalInch.toFixed(2)} inches)`;
+      }
+      
+      // Save calculation to Supabase
+      async function saveCalculation() {
+        const rate = parseFloat(rateInput.value);
+        const yard = parseFloat(yardInput.value || 0);
+        const ghira = parseFloat(ghiraInput.value || 0);
+        const inch = parseFloat(inchInput.value || 0);
+        const price = resultEl.textContent.replace('৳', '').trim();
+        
+        if (isNaN(rate)) {
+          showToast('Please enter a valid rate', true);
+          return;
+        }
+        
+        if (yard === 0 && ghira === 0 && inch === 0) {
+          showToast('Please enter measurements', true);
+          return;
+        }
+        
+        showLoading();
+        
+        try {
+          const { data, error } = await supabased
+            .from('clothtable')
+            .insert([
+              { 
+                rate: rate,
+                yard: yard,
+                ghira: ghira,
+                inch: inch,
+                price: parseFloat(price),
+                created_at: new Date().toISOString()
+              }
+            ])
+            .select();
+            
+          if (error) throw error;
+          
+          showToast('Calculation saved successfully');
+          loadHistory();
+        } catch (error) {
+          console.error('Error saving calculation:', error);
+          showToast('Failed to save calculation', true);
+        } finally {
+          hideLoading();
+        }
+      }
+      
+      // Load history from Supabase
+      async function loadHistory() {
+        showLoading();
+        
+        try {
+          let { data: calculations, error } = await supabased
+            .from('clothtable')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+            
+          if (error) throw error;
+          
+          renderHistory(calculations);
+        } catch (error) {
+          console.error('Error loading history:', error);
+          showToast('Failed to load history', true);
+        } finally {
+          hideLoading();
+        }
+      }
+      
+      // Filter history based on search term
+      async function filterHistory() {
+        const searchTerm = historySearchEl.value.trim().toLowerCase();
+        
+        if (!searchTerm) {
+          loadHistory();
+          return;
+        }
+        
+        showLoading();
+        
+        try {
+          let { data: calculations, error } = await supabased
+            .from('clothtable')
+            .select('*')
+            .or(`yard.eq.${parseFloat(searchTerm)},ghira.eq.${parseFloat(searchTerm)},inch.eq.${parseFloat(searchTerm)},price.eq.${parseFloat(searchTerm)}`)
+            .order('created_at', { ascending: false })
+            .limit(20);
+            
+          if (error) throw error;
+          
+          // Also filter client-side for better matching
+          calculations = calculations.filter(item => 
+            item.yard.toString().includes(searchTerm) ||
+            item.ghira.toString().includes(searchTerm) ||
+            item.inch.toString().includes(searchTerm) ||
+            item.price.toString().includes(searchTerm)
+          );
+          
+          renderHistory(calculations);
+        } catch (error) {
+          console.error('Error filtering history:', error);
+          showToast('Failed to filter history', true);
+        } finally {
+          hideLoading();
+        }
+      }
+      
+      // Render history list
+      function renderHistory(calculations) {
+        if (!calculations || calculations.length === 0) {
+          historyEl.innerHTML = '<li class="text-center py-4 text-gray-500">No history found</li>';
+          historyCountEl.textContent = '0 items';
+          return;
+        }
+        
+        historyEl.innerHTML = calculations.map(item => `
+          <li class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-medium">${item.price} ৳</div>
+                <div class="text-sm text-gray-600 mt-1">
+                  ${item.yard || 0} yd, ${item.ghira || 0} gh, ${item.inch || 0} in
+                </div>
+                <div class="text-xs text-gray-500 mt-1">
+                  ${new Date(item.created_at).toLocaleString()}
+                </div>
+              </div>
+              <div class="flex space-x-2">
+                <button onclick="openEditModal('${item.id}')" class="text-blue-600 hover:text-blue-800">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="deleteCalculation('${item.id}')" class="text-red-600 hover:text-red-800">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
+          </li>
+        `).join('');
+        
+        historyCountEl.textContent = `${calculations.length} ${calculations.length === 1 ? 'item' : 'items'}`;
+      }
+      
+      // Clear all history
+      async function clearHistory() {
+        if (!confirm('Are you sure you want to delete all history? This cannot be undone.')) {
+          return;
+        }
+        
+        showLoading();
+        
+        try {
+          const { error } = await supabased
+            .from('clothtable')
+            .delete()
+            .neq('id', 0); // Delete all records
+            
+          if (error) throw error;
+          
+          showToast('All history cleared');
+          loadHistory();
+        } catch (error) {
+          console.error('Error clearing history:', error);
+          showToast('Failed to clear history', true);
+        } finally {
+          hideLoading();
+        }
+      }
+      
+      // Open edit modal
+      async function openEditModal(id) {
+        showLoading();
+        
+        try {
+          const { data: calculation, error } = await supabased
+            .from('clothtable')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+          if (error) throw error;
+          
+          document.getElementById('editId').value = id;
+          document.getElementById('editRate').value = calculation.rate;
+          document.getElementById('editYard').value = calculation.yard;
+          document.getElementById('editGhira').value = calculation.ghira;
+          document.getElementById('editInch').value = calculation.inch;
+          
+          editModal.classList.remove('hidden');
+        } catch (error) {
+          console.error('Error loading calculation:', error);
+          showToast('Failed to load calculation', true);
+        } finally {
+          hideLoading();
+        }
+      }
+      
+      // Close edit modal
+      function closeEditModal() {
+        editModal.classList.add('hidden');
+      }
+      
+      // Update calculation
+      async function updateCalculation() {
+        const id = document.getElementById('editId').value;
+        const rate = parseFloat(document.getElementById('editRate').value);
+        const yard = parseFloat(document.getElementById('editYard').value || 0);
+        const ghira = parseFloat(document.getElementById('editGhira').value || 0);
+        const inch = parseFloat(document.getElementById('editInch').value || 0);
+        
+        if (isNaN(rate)) {
+          showToast('Please enter a valid rate', true);
+          return;
+        }
+        
+        // Calculate new price
+        const totalInch = (yard * INCH_PER_YARD) + 
+                         (ghira * (INCH_PER_YARD / GHIRA_PER_YARD)) + 
+                         inch;
+        const totalYard = totalInch / INCH_PER_YARD;
+        const price = (totalYard * rate).toFixed(2);
+        
+        showLoading();
+        
+        try {
+          const { data, error } = await supabased
+            .from('clothtable')
+            .update({
+              rate: rate,
+              yard: yard,
+              ghira: ghira,
+              inch: inch,
+              price: parseFloat(price),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select();
+            
+          if (error) throw error;
+          
+          showToast('Calculation updated successfully');
+          closeEditModal();
+          loadHistory();
+        } catch (error) {
+          console.error('Error updating calculation:', error);
+          showToast('Failed to update calculation', true);
+        } finally {
+          hideLoading();
+        }
+      }
+      
+      // Delete calculation
+      async function deleteCalculation(id) {
+        if (!confirm('Are you sure you want to delete this calculation?')) {
+          return;
+        }
+        
+        showLoading();
+        
+        try {
+          const { error } = await supabased
+            .from('clothtable')
+            .delete()
+            .eq('id', id);
+            
+          if (error) throw error;
+          
+          showToast('Calculation deleted');
+          loadHistory();
+        } catch (error) {
+          console.error('Error deleting calculation:', error);
+          showToast('Failed to delete calculation', true);
+        } finally {
+          hideLoading();
+        }
+      }
+      
+      // Print result
+      function printResult() {
+        const rate = rateInput.value || 0;
+        const yard = yardInput.value || 0;
+        const ghira = ghiraInput.value || 0;
+        const inch = inchInput.value || 0;
+        const price = resultEl.textContent;
+        
+        if (yard === 0 && ghira === 0 && inch === 0) {
+          showToast('Nothing to print', true);
+          return;
+        }
+        
+        document.getElementById('printDate').textContent = new Date().toLocaleString();
+        document.getElementById('printRate').textContent = rate;
+        document.getElementById('printMeasurements').textContent = `${yard} yd, ${ghira} gh, ${inch} in`;
+        document.getElementById('printTotal').textContent = price;
+        
+        const printContent = document.getElementById('printTemplate').innerHTML;
+        const originalContent = document.body.innerHTML;
+        
+        document.body.innerHTML = printContent;
+        window.print();
+        document.body.innerHTML = originalContent;
+      }
+      
+      // Make functions available to inline event handlers in dynamically created HTML
+      window.calculatePrice = calculatePrice;
+      window.saveCalculation = saveCalculation;
+      window.openEditModal = openEditModal;
+      window.deleteCalculation = deleteCalculation;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,120 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fabric Price Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: 'Segoe UI', sans-serif;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white min-h-screen p-4">
+    <div class="max-w-2xl mx-auto bg-gray-800 rounded-xl p-6 shadow-lg">
+      <h1 class="text-3xl font-bold text-center mb-6">🧵 Fabric Price Calculator</h1>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block mb-1">1 গজের দাম (টাকা)</label>
+          <input id="rate" type="number" class="w-full p-2 rounded bg-gray-700 text-white" />
+        </div>
+        <div>
+          <label class="block mb-1">গজ</label>
+          <input id="yard" type="number" class="w-full p-2 rounded bg-gray-700 text-white" />
+        </div>
+        <div>
+          <label class="block mb-1">ঘিরা</label>
+          <input id="ghira" type="number" class="w-full p-2 rounded bg-gray-700 text-white" />
+        </div>
+        <div>
+          <label class="block mb-1">ইঞ্চি</label>
+          <input id="inch" type="number" class="w-full p-2 rounded bg-gray-700 text-white" />
+        </div>
+      </div>
+
+      <div class="flex justify-between mt-6 gap-4">
+        <button onclick="calculatePrice()" class="bg-green-600 hover:bg-green-700 w-full py-2 rounded">হিসাব করুন</button>
+        <button onclick="printResult()" class="bg-blue-600 hover:bg-blue-700 w-full py-2 rounded">প্রিন্ট</button>
+      </div>
+
+      <div class="mt-6 bg-gray-700 p-4 rounded">
+        <h2 class="text-xl font-semibold">💰 মোট দাম: <span id="result">0</span> টাকা</h2>
+      </div>
+
+      <div class="mt-6">
+        <h3 class="text-lg font-semibold mb-2">🕘 সর্বশেষ ১০টি হিসাব:</h3>
+        <ul id="history" class="space-y-2 text-sm"></ul>
+      </div>
+    </div>
+
+    <script>
+      const rateInput = document.getElementById("rate");
+      const yardInput = document.getElementById("yard");
+      const ghiraInput = document.getElementById("ghira");
+      const inchInput = document.getElementById("inch");
+      const resultEl = document.getElementById("result");
+      const historyEl = document.getElementById("history");
+
+      const GHIRA_PER_YARD = 16;
+      const UNIT_PER_GHIRA = 6.25;
+      const INCH_PER_YARD = 36;
+
+      function loadRate() {
+        const savedRate = localStorage.getItem("yardRate");
+        if (savedRate) {
+          rateInput.value = savedRate;
+        }
+      }
+
+      function saveRate(rate) {
+        localStorage.setItem("yardRate", rate);
+      }
+
+      function calculatePrice() {
+        const rate = parseFloat(rateInput.value);
+        const yard = parseFloat(yardInput.value || 0);
+        const ghira = parseFloat(ghiraInput.value || 0);
+        const inch = parseFloat(inchInput.value || 0);
+
+        if (isNaN(rate)) return alert("দয়া করে গজের দাম দিন");
+        saveRate(rate);
+
+        const totalInch = (yard * INCH_PER_YARD) + (ghira * (INCH_PER_YARD / GHIRA_PER_YARD)) + inch;
+        const totalYard = totalInch / INCH_PER_YARD;
+        const price = (totalYard * rate).toFixed(2);
+
+        resultEl.textContent = price;
+        saveHistory({ yard, ghira, inch, rate, price });
+        showHistory();
+      }
+
+      function saveHistory(entry) {
+        let history = JSON.parse(localStorage.getItem("calcHistory")) || [];
+        history.unshift(entry);
+        if (history.length > 10) history = history.slice(0, 10);
+        localStorage.setItem("calcHistory", JSON.stringify(history));
+      }
+
+      function showHistory() {
+        const history = JSON.parse(localStorage.getItem("calcHistory")) || [];
+        historyEl.innerHTML = history.map(e => `
+          <li class="bg-gray-600 p-2 rounded">
+            গজ: ${e.yard}, ঘিরা: ${e.ghira}, ইঞ্চি: ${e.inch} → <strong>${e.price} টাকা</strong>
+          </li>`
+        ).join("");
+      }
+
+      function printResult() {
+        const content = `গজ: ${yardInput.value || 0}, ঘিরা: ${ghiraInput.value || 0}, ইঞ্চি: ${inchInput.value || 0}\nমোট দাম: ${resultEl.textContent} টাকা`;
+        const printWindow = window.open("", "", "width=600,height=400");
+        printWindow.document.write(`<pre style='font-size:18px;'>${content}</pre>`);
+        printWindow.print();
+      }
+
+      loadRate();
+      showHistory();
+    </script>
+  </body>
+</html>
